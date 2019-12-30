@@ -44,7 +44,8 @@ except ImportError:
 skipIfNoMatplotlib = unittest.skipIf(not TEST_MATPLOTLIB, "no matplotlib")
 
 import torch
-from common_utils import TestCase, run_tests, TEST_WITH_ASAN
+from torch.testing._internal.common_utils import TestCase, run_tests, TEST_WITH_ASAN
+import torch.testing._internal.expect
 
 def tensor_N(shape, dtype=float):
     numel = np.prod(shape)
@@ -452,10 +453,9 @@ def remove_whitespace(string):
 
 def read_expected_content(function_ptr):
     module_id = function_ptr.__class__.__module__
-    test_dir = os.path.dirname(sys.modules[module_id].__file__)
+    test_dir = os.path.dirname(torch.testing._internal.expect.__file__)
     functionName = function_ptr.id().split('.')[-1]
     expected_file = os.path.join(test_dir,
-                                 "expect",
                                  'TestTensorBoard.' + functionName + ".expect")
     assert os.path.exists(expected_file)
     with open(expected_file, "r") as f:

@@ -14,7 +14,7 @@ import tempfile
 import torch
 import torch._six
 from torch.utils import cpp_extension
-from common_utils import TEST_WITH_ROCM, shell
+from torch.testing._internal.common_utils import TEST_WITH_ROCM, shell
 import torch.distributed as dist
 PY33 = sys.version_info >= (3, 3)
 PY36 = sys.version_info >= (3, 6)
@@ -27,6 +27,7 @@ TESTS = [
     'cuda',
     'cuda_primary_ctx',
     'dataloader',
+    'data_parallel',
     'distributed',
     'distributions',
     'docs_coverage',
@@ -71,7 +72,20 @@ if PY33:
     TESTS.extend([
         'rpc_spawn',
         'dist_autograd_spawn',
+        'dist_optimizer_spawn',
     ])
+
+# For tests not in the test/ directory.
+DIR_FOR_TESTS = {
+    "c10d": "distributed",
+    "c10d_spawn": "distributed",
+    "data_parallel": "distributed",
+    "distributed": "distributed",
+    "nccl": "distributed",
+    "rpc_spawn": "distributed/rpc",
+    "dist_autograd_spawn": "distributed/rpc",
+    "dist_optimizer_spawn": "distributed/rpc",
+}
 
 # skip < 3.6 b/c fstrings added in 3.6
 if PY36:
@@ -140,6 +154,7 @@ def run_test(executable, test_module, test_directory, options, *extra_unittest_a
     # Can't call `python -m unittest test_*` here because it doesn't run code
     # in `if __name__ == '__main__': `. So call `python test_*.py` instead.
     argv = [test_module + '.py'] + unittest_args + list(extra_unittest_args)
+
     command = executable + argv
     return shell(command, test_directory)
 
@@ -431,6 +446,11 @@ def main():
 
     for test in selected_tests:
         test_name = 'test_{}'.format(test)
+
+        # Build the appropriate test path.
+        if test in DIR_FOR_TESTS:
+            test_name = os.path.join(DIR_FOR_TESTS[test], test_name)
+
         test_module = parse_test_module(test)
 
         # Printing the date here can help diagnose which tests are slow

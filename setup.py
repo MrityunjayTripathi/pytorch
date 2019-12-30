@@ -869,6 +869,9 @@ if __name__ == '__main__':
             ],
             'caffe2': [
                 'python/serialized_test/data/operator_test/*.zip',
+            ],
+            'torch.testing._internal.expect': [
+                '*',
             ]
         },
         url='https://pytorch.org/',

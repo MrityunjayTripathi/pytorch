@@ -2,7 +2,7 @@ r"""Importing this file must **not** initialize CUDA context. test_distributed
 relies on this assumption to properly run. This means that when this is imported
 no CUDA calls shall be made, including torch.cuda.device_count(), etc.
 
-common_cuda.py can freely initialize CUDA context when imported.
+torch.testing._internal.common_cuda.py can freely initialize CUDA context when imported.
 """
 
 import sys
@@ -36,7 +36,7 @@ else:
 import __main__
 import errno
 
-import expecttest
+from torch.testing._internal import expecttest
 
 import torch
 import torch.cuda
@@ -45,6 +45,8 @@ from torch._six import string_classes, inf
 import torch.backends.cudnn
 import torch.backends.mkl
 from enum import Enum
+from torch.autograd import gradcheck
+from torch.autograd.gradcheck import gradgradcheck
 
 torch.backends.disable_global_flags()
 
@@ -493,7 +495,7 @@ class CudaMemoryLeakCheck():
 
         # initialize context & RNG to prevent false positive detections
         # when the test is the first to initialize those
-        from common_cuda import initialize_cuda_context_rng
+        from torch.testing._internal.common_cuda import initialize_cuda_context_rng
         initialize_cuda_context_rng()
 
     @staticmethod
@@ -647,7 +649,7 @@ class TestCase(expecttest.TestCase):
         # the import below may initialize CUDA context, so we do it only if
         # self._do_cuda_memory_leak_check or self._do_cuda_non_default_stream
         # is True.
-        from common_cuda import TEST_CUDA
+        from torch.testing._internal.common_cuda import TEST_CUDA
         fullname = self.id().lower()  # class_name.method_name
         if TEST_CUDA and ('gpu' in fullname or 'cuda' in fullname):
             setattr(self, method_name, self.wrap_method_with_cuda_policy(test_method, policy))
@@ -1029,14 +1031,10 @@ class TestCase(expecttest.TestCase):
             if text.startswith(prefix):
                 return text[len(prefix):]
             return text
-        # NB: we take __file__ from the module that defined the test
-        # class, so we place the expect directory where the test script
-        # lives, NOT where test/common_utils.py lives.  This doesn't matter in
-        # PyTorch where all test scripts are in the same directory as
-        # test/common_utils.py, but it matters in onnx-pytorch
+        # Always look for 'expect' in the same directory as 'common_utils.py'.
         module_id = self.__class__.__module__
         munged_id = remove_prefix(self.id(), module_id + ".")
-        test_file = os.path.realpath(sys.modules[module_id].__file__)
+        test_file = os.path.realpath(__file__)
         expected_file = os.path.join(os.path.dirname(test_file),
                                      "expect",
                                      munged_id)
@@ -1408,3 +1406,15 @@ def load_tests(loader, tests, pattern):
             check_test_defined_in_running_script(test)
             test_suite.addTest(test)
     return test_suite
+
+
+def _assertGradAndGradgradChecks(test_case, apply_fn, inputs):
+    # call assert function rather than returning a bool since it's nicer
+    # if we get whether this failed on the gradcheck or the gradgradcheck.
+    test_case.assertTrue(gradcheck(apply_fn, inputs))
+    test_case.assertTrue(gradgradcheck(apply_fn, inputs))
+
+
+dtype2prec = {torch.float: 1e-5,
+              torch.double: 1e-5,
+              torch.half: 1e-2}
